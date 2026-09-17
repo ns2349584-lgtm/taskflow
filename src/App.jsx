@@ -1,823 +1,259 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import "./App.css";
 
-const STORAGE_KEY = "taskflow_tasks";
+const TASKS_KEY = "taskflow_tasks";
+const ACTIVITY_KEY = "taskflow_activity";
 
-const initialTasks = [
-  {
-    id: 1,
-    title: "Design Dashboard",
-    description: "Create the main dashboard UI for TaskFlow.",
-    priority: "High",
-    hours: 4,
-    status: "todo",
-    tags: ["UI", "Design"],
-  },
-  {
-    id: 2,
-    title: "Build Navbar",
-    description: "Create responsive navigation for the application.",
-    priority: "Med",
-    hours: 2,
-    status: "progress",
-    tags: ["Frontend"],
-  },
-  {
-    id: 3,
-    title: "Project Setup",
-    description: "Initialize React project and configure basic files.",
-    priority: "Low",
-    hours: 1,
-    status: "done",
-    tags: ["Setup"],
-  },
-];
+let nextTaskId = 1000;
+let nextActivityId = 1000;
+
+const createTaskId = () => {
+  const id = `task-${nextTaskId}`;
+  nextTaskId += 1;
+  return id;
+};
+
+const createActivityId = () => {
+  const id = `activity-${nextActivityId}`;
+  nextActivityId += 1;
+  return id;
+};
 
 const columns = [
   {
     id: "todo",
     title: "To Do",
-    subtitle: "Things that need to be done",
+    icon: "📝",
   },
   {
     id: "progress",
     title: "In Progress",
-    subtitle: "Currently working on",
+    icon: "⚡",
   },
   {
     id: "done",
     title: "Done",
-    subtitle: "Completed tasks",
+    icon: "✅",
   },
 ];
 
-const normalizeTags = (tags) => {
-  if (!Array.isArray(tags)) return [];
+const initialTasks = [
+  {
+    id: "task-1",
+    title: "Design landing page",
+    description:
+      "Create the main landing page layout and responsive design.",
+    priority: "High",
+    hours: 4,
+    status: "todo",
+    tags: ["Design", "Frontend"],
+    dueDate: "2026-09-20",
+  },
+  {
+    id: "task-2",
+    title: "Build dashboard",
+    description:
+      "Create dashboard cards and sprint progress section.",
+    priority: "Medium",
+    hours: 6,
+    status: "progress",
+    tags: ["React", "UI"],
+    dueDate: "2026-09-18",
+  },
+  {
+    id: "task-3",
+    title: "Project setup",
+    description:
+      "Initialize the TaskFlow project and configure basic styling.",
+    priority: "Low",
+    hours: 2,
+    status: "done",
+    tags: ["Setup"],
+    dueDate: "2026-09-15",
+  },
+];
 
-  return tags
-    .map((tag) => String(tag).trim())
-    .filter(Boolean)
-    .slice(0, 8);
+const emptyForm = {
+  title: "",
+  description: "",
+  priority: "Medium",
+  hours: 1,
+  status: "todo",
+  tags: "",
+  dueDate: "",
 };
 
-function App() {
-  const [tasks, setTasks] = useState(() => {
-    try {
-      const savedTasks = localStorage.getItem(STORAGE_KEY);
+const confettiPieces = [
+  { left: "5%", delay: "0s", duration: "2.2s", rotate: "15deg" },
+  { left: "10%", delay: "0.2s", duration: "2.5s", rotate: "45deg" },
+  { left: "15%", delay: "0.4s", duration: "2.1s", rotate: "80deg" },
+  { left: "20%", delay: "0.1s", duration: "2.4s", rotate: "120deg" },
+  { left: "25%", delay: "0.3s", duration: "2.6s", rotate: "160deg" },
+  { left: "30%", delay: "0.5s", duration: "2.2s", rotate: "200deg" },
+  { left: "35%", delay: "0.15s", duration: "2.7s", rotate: "240deg" },
+  { left: "40%", delay: "0.35s", duration: "2.3s", rotate: "280deg" },
+  { left: "45%", delay: "0.05s", duration: "2.5s", rotate: "320deg" },
+  { left: "50%", delay: "0.25s", duration: "2.1s", rotate: "30deg" },
+  { left: "55%", delay: "0.45s", duration: "2.6s", rotate: "70deg" },
+  { left: "60%", delay: "0.15s", duration: "2.4s", rotate: "110deg" },
+  { left: "65%", delay: "0.35s", duration: "2.2s", rotate: "150deg" },
+  { left: "70%", delay: "0.05s", duration: "2.7s", rotate: "190deg" },
+  { left: "75%", delay: "0.25s", duration: "2.3s", rotate: "230deg" },
+  { left: "80%", delay: "0.45s", duration: "2.5s", rotate: "270deg" },
+  { left: "85%", delay: "0.1s", duration: "2.1s", rotate: "310deg" },
+  { left: "90%", delay: "0.3s", duration: "2.6s", rotate: "350deg" },
+  { left: "95%", delay: "0.2s", duration: "2.4s", rotate: "60deg" },
+  { left: "12%", delay: "0.6s", duration: "2.8s", rotate: "100deg" },
+  { left: "32%", delay: "0.7s", duration: "2.5s", rotate: "140deg" },
+  { left: "52%", delay: "0.55s", duration: "2.7s", rotate: "180deg" },
+  { left: "72%", delay: "0.65s", duration: "2.3s", rotate: "220deg" },
+  { left: "92%", delay: "0.75s", duration: "2.6s", rotate: "260deg" },
+];
 
-      if (savedTasks) {
-        const parsedTasks = JSON.parse(savedTasks);
+function normalizeTags(tags) {
+  if (Array.isArray(tags)) {
+    return tags
+      .map((tag) => String(tag).trim())
+      .filter(Boolean);
+  }
 
-        if (Array.isArray(parsedTasks)) {
-          return parsedTasks.map((task) => ({
-            ...task,
-            tags: normalizeTags(task.tags),
-          }));
-        }
-      }
+  return String(tags || "")
+    .split(",")
+    .map((tag) => tag.trim())
+    .filter(Boolean);
+}
 
-      return initialTasks;
-    } catch (error) {
-      console.error("Could not load tasks:", error);
-      return initialTasks;
-    }
-  });
+function getToday() {
+  const date = new Date();
 
-  const [showDrawer, setShowDrawer] = useState(false);
-  const [editingTask, setEditingTask] = useState(null);
-  const [draggedTaskId, setDraggedTaskId] = useState(null);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
 
-  const [searchQuery, setSearchQuery] = useState("");
-  const [priorityFilter, setPriorityFilter] = useState("All");
-  const [tagFilter, setTagFilter] = useState("All");
+  return `${year}-${month}-${day}`;
+}
 
-  const [formData, setFormData] = useState({
-    title: "",
-    description: "",
-    priority: "Med",
-    hours: "",
-    tags: "",
-  });
+function formatDate(dateString) {
+  if (!dateString) {
+    return "No deadline";
+  }
 
-  const importInputRef = useRef(null);
+  const parts = dateString.split("-");
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
-    } catch (error) {
-      console.error("Could not save tasks:", error);
-    }
-  }, [tasks]);
+  if (parts.length !== 3) {
+    return dateString;
+  }
 
-  const allTags = [
-    ...new Set(tasks.flatMap((task) => normalizeTags(task.tags))),
-  ].sort();
+  return `${parts[2]}/${parts[1]}/${parts[0]}`;
+}
 
-  const filteredTasks = tasks.filter((task) => {
-    const search = searchQuery.trim().toLowerCase();
+function isOverdue(task) {
+  if (!task.dueDate) {
+    return false;
+  }
 
-    const matchesSearch =
-      !search ||
-      task.title.toLowerCase().includes(search) ||
-      task.description.toLowerCase().includes(search) ||
-      normalizeTags(task.tags).some((tag) =>
-        tag.toLowerCase().includes(search)
-      );
+  if (task.status === "done") {
+    return false;
+  }
 
-    const matchesPriority =
-      priorityFilter === "All" ||
-      task.priority === priorityFilter;
+  return task.dueDate < getToday();
+}
 
-    const matchesTag =
-      tagFilter === "All" ||
-      normalizeTags(task.tags).includes(tagFilter);
+function playCompletionSound() {
+  try {
+    const AudioContextClass =
+      window.AudioContext || window.webkitAudioContext;
 
-    return matchesSearch && matchesPriority && matchesTag;
-  });
-
-  const completedCount = tasks.filter(
-    (task) => task.status === "done"
-  ).length;
-
-  const progressPercentage =
-    tasks.length === 0
-      ? 0
-      : Math.round((completedCount / tasks.length) * 100);
-
-  const handleChange = (event) => {
-    const { name, value } = event.target;
-
-    setFormData((previous) => ({
-      ...previous,
-      [name]: value,
-    }));
-  };
-
-  const openAddDrawer = () => {
-    setEditingTask(null);
-
-    setFormData({
-      title: "",
-      description: "",
-      priority: "Med",
-      hours: "",
-      tags: "",
-    });
-
-    setShowDrawer(true);
-  };
-
-  const openEditDrawer = (task) => {
-    setEditingTask(task);
-
-    setFormData({
-      title: task.title,
-      description: task.description,
-      priority: task.priority,
-      hours: task.hours,
-      tags: normalizeTags(task.tags).join(", "),
-    });
-
-    setShowDrawer(true);
-  };
-
-  const closeDrawer = () => {
-    setShowDrawer(false);
-    setEditingTask(null);
-
-    setFormData({
-      title: "",
-      description: "",
-      priority: "Med",
-      hours: "",
-      tags: "",
-    });
-  };
-
-  const handleSubmit = (event) => {
-    event.preventDefault();
-
-    const title = formData.title.trim();
-    const description = formData.description.trim();
-    const hours = Number(formData.hours);
-
-    const tags = formData.tags
-      .split(",")
-      .map((tag) => tag.trim())
-      .filter(Boolean)
-      .slice(0, 8);
-
-    if (!title) {
-      alert("Please enter a task title.");
+    if (!AudioContextClass) {
       return;
     }
 
-    if (!description) {
-      alert("Please enter a description.");
-      return;
-    }
+    const audioContext = new AudioContextClass();
 
-    if (!hours || hours <= 0) {
-      alert("Please enter valid estimated hours.");
-      return;
-    }
+    const oscillator = audioContext.createOscillator();
+    const gain = audioContext.createGain();
 
-    if (editingTask) {
-      setTasks((previousTasks) =>
-        previousTasks.map((task) =>
-          task.id === editingTask.id
-            ? {
-                ...task,
-                title,
-                description,
-                priority: formData.priority,
-                hours,
-                tags,
-              }
-            : task
-        )
-      );
-    } else {
-      const newTask = {
-        id: Date.now(),
-        title,
-        description,
-        priority: formData.priority,
-        hours,
-        status: "todo",
-        tags,
-      };
+    oscillator.type = "sine";
 
-      setTasks((previousTasks) => [
-        ...previousTasks,
-        newTask,
-      ]);
-    }
-
-    closeDrawer();
-  };
-
-  const deleteTask = (taskId) => {
-    const confirmed = window.confirm(
-      "Are you sure you want to delete this task?"
+    oscillator.frequency.setValueAtTime(
+      660,
+      audioContext.currentTime
     );
 
-    if (!confirmed) return;
-
-    setTasks((previousTasks) =>
-      previousTasks.filter((task) => task.id !== taskId)
+    oscillator.frequency.exponentialRampToValueAtTime(
+      990,
+      audioContext.currentTime + 0.12
     );
-  };
 
-  const moveTask = (taskId, newStatus) => {
-    setTasks((previousTasks) =>
-      previousTasks.map((task) =>
-        task.id === taskId
-          ? { ...task, status: newStatus }
-          : task
-      )
+    gain.gain.setValueAtTime(
+      0.0001,
+      audioContext.currentTime
     );
-  };
 
-  const handleDragStart = (taskId) => {
-    setDraggedTaskId(taskId);
-  };
+    gain.gain.exponentialRampToValueAtTime(
+      0.15,
+      audioContext.currentTime + 0.01
+    );
 
-  const handleDragEnd = () => {
-    setDraggedTaskId(null);
-  };
+    gain.gain.exponentialRampToValueAtTime(
+      0.0001,
+      audioContext.currentTime + 0.25
+    );
 
-  const handleDragOver = (event) => {
-    event.preventDefault();
-  };
+    oscillator.connect(gain);
+    gain.connect(audioContext.destination);
 
-  const handleDrop = (status) => {
-    if (draggedTaskId === null) return;
+    oscillator.start();
+    oscillator.stop(
+      audioContext.currentTime + 0.25
+    );
 
-    moveTask(draggedTaskId, status);
-    setDraggedTaskId(null);
-  };
-
-  const exportTasks = () => {
-    const exportData = {
-      app: "TaskFlow",
-      version: "Week 3",
-      exportedAt: new Date().toISOString(),
-      tasks,
+    oscillator.onended = () => {
+      audioContext.close();
     };
+  } catch {
+    // Sound is optional.
+  }
+}
 
-    const blob = new Blob(
-      [JSON.stringify(exportData, null, 2)],
-      {
-        type: "application/json",
-      }
-    );
+function loadTasks() {
+  try {
+    const saved = localStorage.getItem(TASKS_KEY);
 
-    const url = URL.createObjectURL(blob);
-
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `taskflow-backup-${new Date()
-      .toISOString()
-      .slice(0, 10)}.json`;
-
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-
-    URL.revokeObjectURL(url);
-  };
-
-  const openImportPicker = () => {
-    importInputRef.current?.click();
-  };
-
-  const handleImport = async (event) => {
-    const file = event.target.files?.[0];
-
-    if (!file) return;
-
-    try {
-      const text = await file.text();
-      const importedData = JSON.parse(text);
-
-      const importedTasks = Array.isArray(importedData)
-        ? importedData
-        : importedData.tasks;
-
-      if (!Array.isArray(importedTasks)) {
-        throw new Error("Invalid task data");
-      }
-
-      const validTasks = importedTasks
-        .filter(
-          (task) =>
-            task &&
-            task.title &&
-            task.description &&
-            task.status
-        )
-        .map((task, index) => ({
-          id:
-            typeof task.id === "number"
-              ? task.id
-              : Date.now() + index,
-          title: String(task.title),
-          description: String(task.description),
-          priority: ["High", "Med", "Low"].includes(
-            task.priority
-          )
-            ? task.priority
-            : "Med",
-          hours: Number(task.hours) > 0
-            ? Number(task.hours)
-            : 1,
-          status: ["todo", "progress", "done"].includes(
-            task.status
-          )
-            ? task.status
-            : "todo",
-          tags: normalizeTags(task.tags),
-        }));
-
-      if (validTasks.length === 0) {
-        throw new Error("No valid tasks found");
-      }
-
-      const confirmed = window.confirm(
-        `Import ${validTasks.length} task(s) and replace your current board?`
-      );
-
-      if (!confirmed) {
-        event.target.value = "";
-        return;
-      }
-
-      setTasks(validTasks);
-
-      alert(
-        `${validTasks.length} task(s) imported successfully.`
-      );
-    } catch (error) {
-      console.error("Import failed:", error);
-
-      alert(
-        "Import failed. Please select a valid TaskFlow JSON file."
-      );
+    if (!saved) {
+      return initialTasks;
     }
 
-    event.target.value = "";
-  };
+    const parsed = JSON.parse(saved);
 
-  const clearFilters = () => {
-    setSearchQuery("");
-    setPriorityFilter("All");
-    setTagFilter("All");
-  };
+    if (Array.isArray(parsed)) {
+      return parsed;
+    }
 
-  return (
-    <div className="app">
-      <div className="background-glow glow-one"></div>
-      <div className="background-glow glow-two"></div>
+    return initialTasks;
+  } catch {
+    return initialTasks;
+  }
+}
 
-      <header className="navbar">
-        <div className="brand-area">
-          <h1 className="logo">
-            Task<span>Flow</span>
-          </h1>
+function loadActivity() {
+  try {
+    const saved = localStorage.getItem(ACTIVITY_KEY);
 
-          <p className="tagline">
-            Plan. Build. Complete.
-          </p>
-        </div>
+    if (!saved) {
+      return [];
+    }
 
-        <div className="navbar-actions">
-          <button
-            type="button"
-            className="secondary-btn"
-            onClick={openImportPicker}
-          >
-            ↓ Import
-          </button>
+    const parsed = JSON.parse(saved);
 
-          <button
-            type="button"
-            className="secondary-btn"
-            onClick={exportTasks}
-            disabled={tasks.length === 0}
-          >
-            ↑ Export
-          </button>
+    if (Array.isArray(parsed)) {
+      return parsed;
+    }
 
-          <button
-            type="button"
-            className="add-task-btn"
-            onClick={openAddDrawer}
-          >
-            <span>+</span>
-            Add Task
-          </button>
-        </div>
-
-        <input
-          ref={importInputRef}
-          type="file"
-          accept=".json,application/json"
-          className="hidden-file-input"
-          onChange={handleImport}
-        />
-      </header>
-
-      <main className="workspace">
-        <div className="workspace-heading">
-          <div>
-            <h2>Sprint Board</h2>
-
-            <p>
-              Manage your tasks and keep your sprint moving.
-            </p>
-          </div>
-
-          <div className="task-count">
-            {tasks.length}{" "}
-            {tasks.length === 1 ? "Task" : "Tasks"}
-          </div>
-        </div>
-
-        {/* =========================
-            PROGRESS
-        ========================= */}
-
-        <section className="progress-panel">
-          <div className="progress-info">
-            <div>
-              <span className="progress-label">
-                Sprint Progress
-              </span>
-
-              <strong>
-                {progressPercentage}% Complete
-              </strong>
-            </div>
-
-            <span className="progress-summary">
-              {completedCount} of {tasks.length} completed
-            </span>
-          </div>
-
-          <div className="progress-track">
-            <div
-              className="progress-fill"
-              style={{
-                width: `${progressPercentage}%`,
-              }}
-            ></div>
-          </div>
-        </section>
-
-        {/* =========================
-            SEARCH + FILTERS
-        ========================= */}
-
-        <section className="toolbar">
-          <div className="search-box">
-            <span className="search-icon">⌕</span>
-
-            <input
-              type="text"
-              placeholder="Search tasks, descriptions or tags..."
-              value={searchQuery}
-              onChange={(event) =>
-                setSearchQuery(event.target.value)
-              }
-            />
-
-            {searchQuery && (
-              <button
-                type="button"
-                className="clear-search"
-                onClick={() => setSearchQuery("")}
-              >
-                ×
-              </button>
-            )}
-          </div>
-
-          <div className="filter-group">
-            <select
-              value={priorityFilter}
-              onChange={(event) =>
-                setPriorityFilter(event.target.value)
-              }
-            >
-              <option value="All">All Priorities</option>
-              <option value="High">High</option>
-              <option value="Med">Med</option>
-              <option value="Low">Low</option>
-            </select>
-
-            <select
-              value={tagFilter}
-              onChange={(event) =>
-                setTagFilter(event.target.value)
-              }
-            >
-              <option value="All">All Tags</option>
-
-              {allTags.map((tag) => (
-                <option key={tag} value={tag}>
-                  {tag}
-                </option>
-              ))}
-            </select>
-
-            {(searchQuery ||
-              priorityFilter !== "All" ||
-              tagFilter !== "All") && (
-              <button
-                type="button"
-                className="clear-filters"
-                onClick={clearFilters}
-              >
-                Clear
-              </button>
-            )}
-          </div>
-        </section>
-
-        <div className="results-info">
-          Showing{" "}
-          <strong>{filteredTasks.length}</strong> of{" "}
-          <strong>{tasks.length}</strong> tasks
-        </div>
-
-        {/* =========================
-            KANBAN BOARD
-        ========================= */}
-
-        <section className="kanban-board">
-          {columns.map((column) => {
-            const columnTasks = filteredTasks.filter(
-              (task) => task.status === column.id
-            );
-
-            return (
-              <div
-                className={`kanban-column ${
-                  draggedTaskId !== null
-                    ? "drag-active"
-                    : ""
-                }`}
-                key={column.id}
-                onDragOver={handleDragOver}
-                onDrop={() => handleDrop(column.id)}
-              >
-                <div className="column-header">
-                  <div>
-                    <h3>{column.title}</h3>
-
-                    <p>{column.subtitle}</p>
-                  </div>
-
-                  <span className="column-count">
-                    {columnTasks.length}
-                  </span>
-                </div>
-
-                <div className="tasks-container">
-                  {columnTasks.length === 0 ? (
-                    <div className="empty-state">
-                      {draggedTaskId !== null
-                        ? "Drop task here"
-                        : searchQuery ||
-                          priorityFilter !== "All" ||
-                          tagFilter !== "All"
-                        ? "No matching tasks"
-                        : "No tasks here"}
-                    </div>
-                  ) : (
-                    columnTasks.map((task) => (
-                      <TaskCard
-                        key={task.id}
-                        task={task}
-                        onEdit={openEditDrawer}
-                        onDelete={deleteTask}
-                        onMove={moveTask}
-                        onDragStart={handleDragStart}
-                        onDragEnd={handleDragEnd}
-                        isDragging={
-                          draggedTaskId === task.id
-                        }
-                      />
-                    ))
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </section>
-      </main>
-
-      {/* =========================
-          DRAWER
-      ========================= */}
-
-      {showDrawer && (
-        <div
-          className="drawer-overlay"
-          onClick={closeDrawer}
-        >
-          <aside
-            className="task-drawer"
-            onClick={(event) =>
-              event.stopPropagation()
-            }
-          >
-            <div className="drawer-header">
-              <div>
-                <h2>
-                  {editingTask
-                    ? "Edit Task"
-                    : "Create New Task"}
-                </h2>
-
-                <p>
-                  {editingTask
-                    ? "Update your task details."
-                    : "Add a task to your sprint board."}
-                </p>
-              </div>
-
-              <button
-                type="button"
-                className="close-btn"
-                onClick={closeDrawer}
-              >
-                ×
-              </button>
-            </div>
-
-            <form
-              className="task-form"
-              onSubmit={handleSubmit}
-            >
-              <div className="form-group">
-                <label htmlFor="title">
-                  Task Title
-                </label>
-
-                <input
-                  id="title"
-                  type="text"
-                  name="title"
-                  value={formData.title}
-                  onChange={handleChange}
-                  placeholder="e.g. Build Login Page"
-                />
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="description">
-                  Description
-                </label>
-
-                <textarea
-                  id="description"
-                  name="description"
-                  value={formData.description}
-                  onChange={handleChange}
-                  placeholder="Describe what needs to be done..."
-                  rows="5"
-                />
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label htmlFor="priority">
-                    Urgency
-                  </label>
-
-                  <select
-                    id="priority"
-                    name="priority"
-                    value={formData.priority}
-                    onChange={handleChange}
-                  >
-                    <option value="High">
-                      High
-                    </option>
-
-                    <option value="Med">
-                      Med
-                    </option>
-
-                    <option value="Low">
-                      Low
-                    </option>
-                  </select>
-                </div>
-
-                <div className="form-group">
-                  <label htmlFor="hours">
-                    Estimated Hours
-                  </label>
-
-                  <input
-                    id="hours"
-                    type="number"
-                    name="hours"
-                    min="0.5"
-                    step="0.5"
-                    value={formData.hours}
-                    onChange={handleChange}
-                    placeholder="e.g. 3"
-                  />
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="tags">
-                  Tags
-                </label>
-
-                <input
-                  id="tags"
-                  type="text"
-                  name="tags"
-                  value={formData.tags}
-                  onChange={handleChange}
-                  placeholder="e.g. UI, Frontend, Urgent"
-                />
-
-                <small className="form-help">
-                  Separate multiple tags with commas.
-                </small>
-              </div>
-
-              <div className="form-actions">
-                <button
-                  type="button"
-                  className="cancel-btn"
-                  onClick={closeDrawer}
-                >
-                  Cancel
-                </button>
-
-                <button
-                  type="submit"
-                  className="submit-btn"
-                >
-                  {editingTask
-                    ? "Save Changes"
-                    : "Add Task"}
-                </button>
-              </div>
-            </form>
-          </aside>
-        </div>
-      )}
-    </div>
-  );
+    return [];
+  } catch {
+    return [];
+  }
 }
 
 function TaskCard({
@@ -826,159 +262,1156 @@ function TaskCard({
   onDelete,
   onMove,
   onDragStart,
-  onDragEnd,
-  isDragging,
 }) {
-  const previousColumn = {
-    todo: null,
-    progress: "todo",
-    done: "progress",
-  };
-
-  const nextColumn = {
-    todo: "progress",
-    progress: "done",
-    done: null,
-  };
-
-  const getNextLabel = () => {
-    if (task.status === "todo") {
-      return "In Progress";
-    }
-
-    if (task.status === "progress") {
-      return "Done";
-    }
-
-    return "";
-  };
-
-  const getPreviousLabel = () => {
-    if (task.status === "progress") {
-      return "To Do";
-    }
-
-    if (task.status === "done") {
-      return "In Progress";
-    }
-
-    return "";
-  };
+  const overdue = isOverdue(task);
 
   return (
     <article
       className={`task-card ${
-        isDragging ? "dragging" : ""
+        overdue ? "task-overdue" : ""
       }`}
       draggable
       onDragStart={() => onDragStart(task.id)}
-      onDragEnd={onDragEnd}
     >
       <div className="task-card-top">
         <span
-          className={`priority-badge ${task.priority.toLowerCase()}`}
+          className={`priority priority-${task.priority.toLowerCase()}`}
         >
           {task.priority}
         </span>
 
-        <div className="task-actions">
-          <button
-            type="button"
-            className="card-action edit-action"
-            onClick={() => onEdit(task)}
-            title="Edit task"
-          >
-            ✎
-          </button>
-
-          <button
-            type="button"
-            className="card-action delete-action"
-            onClick={() => onDelete(task.id)}
-            title="Delete task"
-          >
-            🗑
-          </button>
-        </div>
+        {overdue && (
+          <span className="overdue-badge">
+            ⚠ Overdue
+          </span>
+        )}
       </div>
 
-      <h4>{task.title}</h4>
+      <h3>{task.title}</h3>
 
-      <p className="task-description">
-        {task.description}
-      </p>
+      {task.description && (
+        <p className="task-description">
+          {task.description}
+        </p>
+      )}
 
-      {normalizeTags(task.tags).length > 0 && (
+      <div className="task-meta">
+        <span>⏱ {task.hours}h</span>
+
+        {task.dueDate && (
+          <span
+            className={
+              overdue ? "deadline-overdue" : ""
+            }
+          >
+            📅 {formatDate(task.dueDate)}
+          </span>
+        )}
+      </div>
+
+      {task.tags?.length > 0 && (
         <div className="task-tags">
-          {normalizeTags(task.tags).map((tag) => (
-            <span className="task-tag" key={tag}>
+          {task.tags.map((tag) => (
+            <span
+              className="task-tag"
+              key={`${task.id}-${tag}`}
+            >
               #{tag}
             </span>
           ))}
         </div>
       )}
 
-      <div className="task-footer">
-        <div className="time-info">
-          <span>◷</span>
-
-          {task.hours}{" "}
-          {Number(task.hours) === 1
-            ? "hour"
-            : "hours"}
-        </div>
-
-        <div className="task-status-dot"></div>
-      </div>
-
-      <div className="move-controls">
-        {previousColumn[task.status] ? (
+      <div className="task-actions">
+        {task.status !== "todo" && (
           <button
             type="button"
-            className="move-control move-back"
             onClick={() =>
-              onMove(
-                task.id,
-                previousColumn[task.status]
-              )
+              onMove(task.id, "todo")
             }
+            title="Move to To Do"
           >
-            <span className="move-arrow">
-              ←
-            </span>
-
-            <span>{getPreviousLabel()}</span>
+            ←
           </button>
-        ) : (
-          <div className="move-placeholder"></div>
         )}
 
-        {nextColumn[task.status] ? (
+        {task.status !== "progress" && (
           <button
             type="button"
-            className="move-control move-forward"
             onClick={() =>
-              onMove(
-                task.id,
-                nextColumn[task.status]
-              )
+              onMove(task.id, "progress")
             }
+            title="Move to In Progress"
           >
-            <span>{getNextLabel()}</span>
-
-            <span className="move-arrow">
-              →
-            </span>
+            →
           </button>
-        ) : (
-          <div className="move-placeholder"></div>
         )}
-      </div>
 
-      <div className="drag-hint">
-        ⋮⋮ Drag to move
+        {task.status !== "done" && (
+          <button
+            type="button"
+            onClick={() =>
+              onMove(task.id, "done")
+            }
+            title="Mark as Done"
+          >
+            ✓
+          </button>
+        )}
+
+        <button
+          type="button"
+          onClick={() => onEdit(task)}
+          title="Edit task"
+        >
+          ✏️
+        </button>
+
+        <button
+          type="button"
+          className="delete-btn"
+          onClick={() => onDelete(task.id)}
+          title="Delete task"
+        >
+          🗑
+        </button>
       </div>
     </article>
+  );
+}
+
+function App() {
+  /*
+    IMPORTANT:
+    Initial state is loaded directly through the
+    useState initializer.
+
+    This avoids calling setState synchronously
+    inside useEffect.
+  */
+  const [tasks, setTasks] = useState(loadTasks);
+  const [activity, setActivity] =
+    useState(loadActivity);
+
+  const [isDrawerOpen, setIsDrawerOpen] =
+    useState(false);
+
+  const [editingTask, setEditingTask] =
+    useState(null);
+
+  const [draggedTaskId, setDraggedTaskId] =
+    useState(null);
+
+  const [searchQuery, setSearchQuery] =
+    useState("");
+
+  const [priorityFilter, setPriorityFilter] =
+    useState("All");
+
+  const [tagFilter, setTagFilter] =
+    useState("All");
+
+  const [formData, setFormData] =
+    useState(emptyForm);
+
+  const [showActivity, setShowActivity] =
+    useState(false);
+
+  const [celebration, setCelebration] =
+    useState(null);
+
+  /*
+    SAVE TASKS
+  */
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        TASKS_KEY,
+        JSON.stringify(tasks)
+      );
+    } catch {
+      // Ignore storage errors.
+    }
+  }, [tasks]);
+
+  /*
+    SAVE ACTIVITY
+  */
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        ACTIVITY_KEY,
+        JSON.stringify(activity)
+      );
+    } catch {
+      // Ignore storage errors.
+    }
+  }, [activity]);
+
+  /*
+    Auto hide celebration.
+    No synchronous state update here.
+  */
+  useEffect(() => {
+    if (!celebration) {
+      return undefined;
+    }
+
+    const timer = window.setTimeout(() => {
+      setCelebration(null);
+    }, 2800);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [celebration]);
+
+  const addActivity = (message) => {
+    const newActivity = {
+      id: createActivityId(),
+      message,
+      timestamp: new Date().toLocaleString(),
+    };
+
+    setActivity((previous) =>
+      [newActivity, ...previous].slice(0, 50)
+    );
+  };
+
+  const openCreateDrawer = () => {
+    setEditingTask(null);
+    setFormData(emptyForm);
+    setIsDrawerOpen(true);
+  };
+
+  const openEditDrawer = (task) => {
+    setEditingTask(task);
+
+    setFormData({
+      title: task.title || "",
+      description: task.description || "",
+      priority: task.priority || "Medium",
+      hours: task.hours || 1,
+      status: task.status || "todo",
+      tags: (task.tags || []).join(", "),
+      dueDate: task.dueDate || "",
+    });
+
+    setIsDrawerOpen(true);
+  };
+
+  const closeDrawer = () => {
+    setIsDrawerOpen(false);
+    setEditingTask(null);
+    setFormData(emptyForm);
+  };
+
+  const handleInputChange = (event) => {
+    const { name, value } = event.target;
+
+    setFormData((previous) => ({
+      ...previous,
+      [name]: value,
+    }));
+  };
+
+  const handleSubmit = (event) => {
+    event.preventDefault();
+
+    const title = formData.title.trim();
+
+    if (!title) {
+      return;
+    }
+
+    if (editingTask) {
+      setTasks((previous) =>
+        previous.map((task) =>
+          task.id === editingTask.id
+            ? {
+                ...task,
+                title,
+                description:
+                  formData.description.trim(),
+                priority: formData.priority,
+                hours:
+                  Number(formData.hours) || 1,
+                status: formData.status,
+                tags: normalizeTags(
+                  formData.tags
+                ),
+                dueDate: formData.dueDate,
+              }
+            : task
+        )
+      );
+
+      addActivity(
+        `Edited task "${title}"`
+      );
+    } else {
+      const newTask = {
+        id: createTaskId(),
+        title,
+        description:
+          formData.description.trim(),
+        priority: formData.priority,
+        hours:
+          Number(formData.hours) || 1,
+        status: formData.status,
+        tags: normalizeTags(formData.tags),
+        dueDate: formData.dueDate,
+      };
+
+      setTasks((previous) => [
+        ...previous,
+        newTask,
+      ]);
+
+      addActivity(
+        `Created task "${title}"`
+      );
+
+      if (newTask.status === "done") {
+        playCompletionSound();
+        setCelebration("task");
+      }
+    }
+
+    closeDrawer();
+  };
+
+  const deleteTask = (taskId) => {
+    const task = tasks.find(
+      (item) => item.id === taskId
+    );
+
+    if (!task) {
+      return;
+    }
+
+    setTasks((previous) =>
+      previous.filter(
+        (item) => item.id !== taskId
+      )
+    );
+
+    addActivity(
+      `Deleted task "${task.title}"`
+    );
+  };
+
+  const moveTask = (taskId, newStatus) => {
+    const task = tasks.find(
+      (item) => item.id === taskId
+    );
+
+    if (!task) {
+      return;
+    }
+
+    if (task.status === newStatus) {
+      return;
+    }
+
+    const wasDone = task.status === "done";
+    const isDone = newStatus === "done";
+
+    setTasks((previous) =>
+      previous.map((item) =>
+        item.id === taskId
+          ? {
+              ...item,
+              status: newStatus,
+            }
+          : item
+      )
+    );
+
+    if (isDone && !wasDone) {
+      addActivity(
+        `Completed task "${task.title}"`
+      );
+
+      playCompletionSound();
+
+      const allTasksDone = tasks.every(
+        (item) =>
+          item.id === taskId ||
+          item.status === "done"
+      );
+
+      if (allTasksDone) {
+        addActivity(
+          "🎉 Sprint completed — all tasks are Done!"
+        );
+
+        setCelebration("sprint");
+      } else {
+        setCelebration("task");
+      }
+
+      return;
+    }
+
+    const destination =
+      columns.find(
+        (column) => column.id === newStatus
+      )?.title || newStatus;
+
+    addActivity(
+      `Moved task "${task.title}" to ${destination}`
+    );
+  };
+
+  const handleDragStart = (taskId) => {
+    setDraggedTaskId(taskId);
+  };
+
+  const handleDragOver = (event) => {
+    event.preventDefault();
+  };
+
+  const handleDrop = (status) => {
+    if (!draggedTaskId) {
+      return;
+    }
+
+    moveTask(draggedTaskId, status);
+    setDraggedTaskId(null);
+  };
+
+  const allTags = Array.from(
+    new Set(
+      tasks.flatMap((task) =>
+        normalizeTags(task.tags)
+      )
+    )
+  );
+
+  const filteredTasks = tasks.filter((task) => {
+    const query = searchQuery
+      .trim()
+      .toLowerCase();
+
+    const matchesSearch =
+      !query ||
+      task.title
+        .toLowerCase()
+        .includes(query) ||
+      task.description
+        .toLowerCase()
+        .includes(query) ||
+      normalizeTags(task.tags).some(
+        (tag) =>
+          tag.toLowerCase().includes(query)
+      );
+
+    const matchesPriority =
+      priorityFilter === "All" ||
+      task.priority === priorityFilter;
+
+    const matchesTag =
+      tagFilter === "All" ||
+      normalizeTags(task.tags).includes(
+        tagFilter
+      );
+
+    return (
+      matchesSearch &&
+      matchesPriority &&
+      matchesTag
+    );
+  });
+
+  const completedCount = tasks.filter(
+    (task) => task.status === "done"
+  ).length;
+
+  const totalTasks = tasks.length;
+
+  const progress =
+    totalTasks === 0
+      ? 0
+      : Math.round(
+          (completedCount / totalTasks) * 100
+        );
+
+  const overdueCount = tasks.filter(
+    (task) => isOverdue(task)
+  ).length;
+
+  const clearFilters = () => {
+    setSearchQuery("");
+    setPriorityFilter("All");
+    setTagFilter("All");
+  };
+
+  const clearActivity = () => {
+    setActivity([]);
+  };
+
+  const exportTasks = () => {
+    const exportData = {
+      tasks,
+      activity,
+      exportedAt:
+        new Date().toLocaleString(),
+    };
+
+    const blob = new Blob(
+      [
+        JSON.stringify(
+          exportData,
+          null,
+          2
+        ),
+      ],
+      {
+        type: "application/json",
+      }
+    );
+
+    const url =
+      URL.createObjectURL(blob);
+
+    const link =
+      document.createElement("a");
+
+    link.href = url;
+    link.download =
+      "taskflow-backup.json";
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    URL.revokeObjectURL(url);
+
+    addActivity(
+      "Exported TaskFlow data"
+    );
+  };
+
+  const importTasks = (event) => {
+    const file =
+      event.target.files?.[0];
+
+    if (!file) {
+      return;
+    }
+
+    const reader =
+      new FileReader();
+
+    reader.onload = (loadEvent) => {
+      try {
+        const imported = JSON.parse(
+          loadEvent.target.result
+        );
+
+        if (Array.isArray(imported)) {
+          setTasks(imported);
+
+          addActivity(
+            "Imported tasks successfully"
+          );
+        } else if (
+          imported &&
+          Array.isArray(imported.tasks)
+        ) {
+          setTasks(imported.tasks);
+
+          if (
+            Array.isArray(
+              imported.activity
+            )
+          ) {
+            setActivity(
+              imported.activity
+            );
+          }
+
+          addActivity(
+            "Imported TaskFlow backup successfully"
+          );
+        } else {
+          alert(
+            "Invalid TaskFlow JSON file."
+          );
+        }
+      } catch {
+        alert(
+          "Could not read the JSON file."
+        );
+      }
+    };
+
+    reader.readAsText(file);
+
+    event.target.value = "";
+  };
+
+  return (
+    <div className="app-shell">
+      <header className="app-header">
+        <div>
+          <h1>TaskFlow</h1>
+          <p>Sprint workspace</p>
+        </div>
+
+        <div className="header-actions">
+          <button
+            type="button"
+            onClick={() =>
+              setShowActivity(
+                (previous) => !previous
+              )
+            }
+          >
+            📋 Activity
+          </button>
+
+          <button
+            type="button"
+            onClick={exportTasks}
+          >
+            ⬇ Export
+          </button>
+
+          <label className="import-button">
+            ⬆ Import
+
+            <input
+              type="file"
+              accept=".json,application/json"
+              onChange={importTasks}
+              hidden
+            />
+          </label>
+
+          <button
+            type="button"
+            className="primary-btn"
+            onClick={openCreateDrawer}
+          >
+            + New Task
+          </button>
+        </div>
+      </header>
+
+      <section className="dashboard">
+        <div className="dashboard-card">
+          <span>Total Tasks</span>
+          <strong>{totalTasks}</strong>
+        </div>
+
+        <div className="dashboard-card">
+          <span>Completed</span>
+          <strong>
+            {completedCount}
+          </strong>
+        </div>
+
+        <div className="dashboard-card">
+          <span>Overdue</span>
+
+          <strong
+            className={
+              overdueCount > 0
+                ? "danger-number"
+                : ""
+            }
+          >
+            {overdueCount}
+          </strong>
+        </div>
+
+        <div className="dashboard-card progress-card">
+          <div className="progress-header">
+            <span>Sprint Progress</span>
+
+            <strong>
+              {progress}%
+            </strong>
+          </div>
+
+          <div className="progress-bar">
+            <div
+              className="progress-fill"
+              style={{
+                width: `${progress}%`,
+              }}
+            />
+          </div>
+        </div>
+      </section>
+
+      <section className="filters">
+        <div className="search-box">
+          🔎
+
+          <input
+            type="text"
+            placeholder="Search tasks..."
+            value={searchQuery}
+            onChange={(event) =>
+              setSearchQuery(
+                event.target.value
+              )
+            }
+          />
+        </div>
+
+        <select
+          value={priorityFilter}
+          onChange={(event) =>
+            setPriorityFilter(
+              event.target.value
+            )
+          }
+        >
+          <option value="All">
+            All Priorities
+          </option>
+
+          <option value="High">
+            High
+          </option>
+
+          <option value="Medium">
+            Medium
+          </option>
+
+          <option value="Low">
+            Low
+          </option>
+        </select>
+
+        <select
+          value={tagFilter}
+          onChange={(event) =>
+            setTagFilter(
+              event.target.value
+            )
+          }
+        >
+          <option value="All">
+            All Tags
+          </option>
+
+          {allTags.map((tag) => (
+            <option
+              key={tag}
+              value={tag}
+            >
+              {tag}
+            </option>
+          ))}
+        </select>
+
+        {(searchQuery ||
+          priorityFilter !== "All" ||
+          tagFilter !== "All") && (
+          <button
+            type="button"
+            onClick={clearFilters}
+          >
+            Clear
+          </button>
+        )}
+      </section>
+
+      <div className="workspace">
+        <main className="board">
+          {columns.map((column) => {
+            const columnTasks =
+              filteredTasks.filter(
+                (task) =>
+                  task.status ===
+                  column.id
+              );
+
+            return (
+              <section
+                className="board-column"
+                key={column.id}
+                onDragOver={
+                  handleDragOver
+                }
+                onDrop={() =>
+                  handleDrop(
+                    column.id
+                  )
+                }
+              >
+                <div className="column-header">
+                  <div>
+                    <span className="column-icon">
+                      {column.icon}
+                    </span>
+
+                    <h2>
+                      {column.title}
+                    </h2>
+                  </div>
+
+                  <span className="column-count">
+                    {columnTasks.length}
+                  </span>
+                </div>
+
+                <div className="task-list">
+                  {columnTasks.length ===
+                  0 ? (
+                    <div className="empty-column">
+                      <span>
+                        📭
+                      </span>
+
+                      <p>
+                        No tasks here
+                      </p>
+                    </div>
+                  ) : (
+                    columnTasks.map(
+                      (task) => (
+                        <TaskCard
+                          key={task.id}
+                          task={task}
+                          onEdit={
+                            openEditDrawer
+                          }
+                          onDelete={
+                            deleteTask
+                          }
+                          onMove={
+                            moveTask
+                          }
+                          onDragStart={
+                            handleDragStart
+                          }
+                        />
+                      )
+                    )
+                  )}
+                </div>
+              </section>
+            );
+          })}
+        </main>
+
+        {showActivity && (
+          <aside className="activity-panel">
+            <div className="activity-header">
+              <div>
+                <h2>
+                  Activity Log
+                </h2>
+
+                <p>
+                  Recent sprint actions
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={
+                  clearActivity
+                }
+              >
+                Clear
+              </button>
+            </div>
+
+            <div className="activity-list">
+              {activity.length ===
+              0 ? (
+                <div className="empty-activity">
+                  No activity yet.
+                </div>
+              ) : (
+                activity.map(
+                  (item) => (
+                    <div
+                      className="activity-item"
+                      key={item.id}
+                    >
+                      <span className="activity-dot" />
+
+                      <div>
+                        <p>
+                          {item.message}
+                        </p>
+
+                        <small>
+                          {
+                            item.timestamp
+                          }
+                        </small>
+                      </div>
+                    </div>
+                  )
+                )
+              )}
+            </div>
+          </aside>
+        )}
+      </div>
+
+      {isDrawerOpen && (
+        <div
+          className="drawer-overlay"
+          onMouseDown={(event) => {
+            if (
+              event.target ===
+              event.currentTarget
+            ) {
+              closeDrawer();
+            }
+          }}
+        >
+          <aside className="task-drawer">
+            <div className="drawer-header">
+              <div>
+                <h2>
+                  {editingTask
+                    ? "Edit Task"
+                    : "Create Task"}
+                </h2>
+
+                <p>
+                  Add details for your
+                  sprint task.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={closeDrawer}
+              >
+                ✕
+              </button>
+            </div>
+
+            <form
+              className="task-form"
+              onSubmit={
+                handleSubmit
+              }
+            >
+              <label>
+                Title
+
+                <input
+                  type="text"
+                  name="title"
+                  value={
+                    formData.title
+                  }
+                  onChange={
+                    handleInputChange
+                  }
+                  placeholder="Task title"
+                  required
+                />
+              </label>
+
+              <label>
+                Description
+
+                <textarea
+                  name="description"
+                  value={
+                    formData.description
+                  }
+                  onChange={
+                    handleInputChange
+                  }
+                  placeholder="Describe the task..."
+                  rows="4"
+                />
+              </label>
+
+              <div className="form-grid">
+                <label>
+                  Priority
+
+                  <select
+                    name="priority"
+                    value={
+                      formData.priority
+                    }
+                    onChange={
+                      handleInputChange
+                    }
+                  >
+                    <option value="High">
+                      High
+                    </option>
+
+                    <option value="Medium">
+                      Medium
+                    </option>
+
+                    <option value="Low">
+                      Low
+                    </option>
+                  </select>
+                </label>
+
+                <label>
+                  Estimated Hours
+
+                  <input
+                    type="number"
+                    name="hours"
+                    min="1"
+                    step="1"
+                    value={
+                      formData.hours
+                    }
+                    onChange={
+                      handleInputChange
+                    }
+                  />
+                </label>
+              </div>
+
+              <div className="form-grid">
+                <label>
+                  Status
+
+                  <select
+                    name="status"
+                    value={
+                      formData.status
+                    }
+                    onChange={
+                      handleInputChange
+                    }
+                  >
+                    <option value="todo">
+                      To Do
+                    </option>
+
+                    <option value="progress">
+                      In Progress
+                    </option>
+
+                    <option value="done">
+                      Done
+                    </option>
+                  </select>
+                </label>
+
+                <label>
+                  Due Date
+
+                  <input
+                    type="date"
+                    name="dueDate"
+                    value={
+                      formData.dueDate
+                    }
+                    onChange={
+                      handleInputChange
+                    }
+                  />
+                </label>
+              </div>
+
+              <label>
+                Tags
+
+                <input
+                  type="text"
+                  name="tags"
+                  value={
+                    formData.tags
+                  }
+                  onChange={
+                    handleInputChange
+                  }
+                  placeholder="React, Frontend, Design"
+                />
+
+                <small>
+                  Separate tags with
+                  commas.
+                </small>
+              </label>
+
+              <div className="drawer-actions">
+                <button
+                  type="button"
+                  onClick={
+                    closeDrawer
+                  }
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  className="primary-btn"
+                >
+                  {editingTask
+                    ? "Save Changes"
+                    : "Create Task"}
+                </button>
+              </div>
+            </form>
+          </aside>
+        </div>
+      )}
+
+      {celebration && (
+        <div className="celebration-overlay">
+          <div className="celebration-message">
+            <div className="celebration-icon">
+              {celebration ===
+              "sprint"
+                ? "🏆"
+                : "🎉"}
+            </div>
+
+            <h2>
+              {celebration ===
+              "sprint"
+                ? "Sprint Complete!"
+                : "Task Completed!"}
+            </h2>
+
+            <p>
+              {celebration ===
+              "sprint"
+                ? "Amazing! All tasks are done."
+                : "Great work! Keep going."}
+            </p>
+          </div>
+
+          <div className="confetti-container">
+            {confettiPieces.map(
+              (piece, index) => (
+                <span
+                  className="confetti-piece"
+                  key={`confetti-${index}`}
+                  style={{
+                    left: piece.left,
+                    animationDelay:
+                      piece.delay,
+                    animationDuration:
+                      piece.duration,
+                    transform: `rotate(${piece.rotate})`,
+                  }}
+                />
+              )
+            )}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
